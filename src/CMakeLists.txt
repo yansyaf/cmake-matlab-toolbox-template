@@ -1,0 +1,84 @@
+set(MEX_LIBRARY_NAME MyLibrary)
+
+set(MEX_SRC_FILES
+	${CMAKE_CURRENT_SOURCE_DIR}/func1.c
+	${CMAKE_CURRENT_SOURCE_DIR}/MyLibrary.c
+)
+
+set(M_SRC_FILES 
+	${CMAKE_CURRENT_SOURCE_DIR}/func1.m
+	${CMAKE_CURRENT_SOURCE_DIR}/func2.m
+)
+
+unset(M_SRC_FILES_COLLECT CACHE)
+foreach (_src ${M_SRC_FILES})
+	set( M_SRC_FILES_COLLECT "${M_SRC_FILES_COLLECT} ${_src}" )
+endforeach (_src ${M_SRC_FILES})
+
+add_custom_command(
+	OUTPUT mex.out
+	COMMAND ${MATLAB_MEX_EXECUTABLE} -O CFLAGS="\$CFLAGS -std=c99" -output ${MEX_LIBRARY_NAME} ${MEX_SRC_FILES}
+	ARGS -I${MATLAB_INCLUDE_DIR}  
+	COMMENT "Compiling MEX Files"
+)
+
+add_custom_command(
+	DEPENDS mex.out
+	OUTPUT pcode.out
+	COMMAND matlab -nodisplay -nosplash -nodesktop -r 
+	ARGS "pcode ${M_SRC_FILES_COLLECT}; quit"
+	COMMENT "Compiling M-file into p-code"
+)
+
+add_custom_target(mex DEPENDS mex.out)
+add_custom_target(pcode DEPENDS pcode.out)
+
+#####################################################
+## PACKAGE 
+#####################################################
+set(CPACK_PACKAGE_NAME ${PROJECT_NAME})
+SET(CPACK_PACKAGE_VENDOR ${PROJECT_NAME})
+#SET(CPACK_PACKAGE_EXECUTABLES ${PROJECT_NAME};${PROJECT_NAME})
+
+SET(CPACK_PACKAGE_INSTALL_REGISTRY_KEY "${PROJECT_NAME} 1.0.0")
+SET(CPACK_PACKAGE_VERSION "1.0.0")
+SET(CPACK_PACKAGE_VERSION_MAJOR "1")
+SET(CPACK_PACKAGE_VERSION_MINOR "0")
+SET(CPACK_PACKAGE_VERSION_PATCH "0")
+
+IF(WIN32 AND NOT UNIX)
+#  SET(CPACK_NSIS_INSTALLED_ICON_NAME "bin\\\\${PROJECT_NAME}.exe")
+  SET(CPACK_NSIS_DISPLAY_NAME "${CPACK_PACKAGE_INSTALL_DIRECTORY}${PROJECT_NAME}")
+  SET(CPACK_NSIS_MODIFY_PATH ON)
+ENDIF(WIN32 AND NOT UNIX)
+
+#INCLUDE(InstallRequiredSystemLibraries)
+
+IF(UNIX AND NOT APPLE)
+    INSTALL(TARGETS ${PROJECT_NAME}
+        DESTINATION bin
+    )
+
+    FOREACH(LIB QtCore QtXml QtTest QtWebKit QtGui QtNetwork QtScript)
+        INSTALL(FILES
+            "${QT_LIBRARY_DIR}/lib${LIB}.so.${QT_VERSION_MAJOR}.${QT_VERSION_MINOR}.${QT_VERSION_PATCH}" 
+            RENAME "lib${LIB}.so.${QT_VERSION_MAJOR}" 
+            DESTINATION bin
+        )
+    ENDFOREACH(LIB)
+ENDIF(UNIX AND NOT APPLE)
+
+IF(WIN32)
+	install(
+		DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/
+	    DESTINATION "toolbox"
+	    FILES_MATCHING 
+	    PATTERN "*.p"
+	    PATTERN "*.mex*"
+	    PATTERN "CMakeFiles" EXCLUDE
+	    PATTERN "Win32" EXCLUDE
+	    PERMISSIONS OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
+	)
+ENDIF(WIN32)
+
+INCLUDE(CPack)
